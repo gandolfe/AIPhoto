@@ -2,7 +2,6 @@ package com.aiphoto.ai
 
 import android.content.Context
 import android.graphics.Bitmap
-import android.os.SystemClock
 import android.util.Log
 import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.sync.Mutex
@@ -33,16 +32,10 @@ class SceneAnalyzer(private val appContext: Context) : AutoCloseable {
      * 对单张图片分类。模型缺失或推理失败时返回 null。
      */
     suspend fun analyze(bitmap: Bitmap): ClipSceneClassifier.SceneResult? = withContext(dispatcher) {
-        val t0 = SystemClock.elapsedRealtime()
         val engine = ensureClassifier() ?: return@withContext null
-        val t1 = SystemClock.elapsedRealtime()
-        Log.i(TAG, "ensureClassifier 耗时 ${t1 - t0} ms")
-
-        val r = runCatching { engine.classify(bitmap) }
+        runCatching { engine.classify(bitmap) }
             .onFailure { Log.e(TAG, "推理失败", it) }
             .getOrNull()
-        Log.i(TAG, "classify 耗时 ${SystemClock.elapsedRealtime() - t1} ms")
-        r
     }
 
     private suspend fun ensureClassifier(): ClipSceneClassifier? = loadMutex.withLock {

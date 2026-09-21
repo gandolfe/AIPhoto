@@ -70,30 +70,20 @@ class ClipSceneClassifier private constructor(
      *   → 点积 label_bank[N,512] → logits → softmax(·logit_scale) → probs
      */
     fun classify(bitmap: Bitmap): SceneResult {
-        val _t0 = SystemClock.elapsedRealtime()
-
         // 1. fp32 [1,3,H,W] → ShortBuffer (IEEE half)
-        fun now() = SystemClock.elapsedRealtime()
         val pixels = ImagePreprocessor.toClipInput(bitmap)
-        Log.i(TAG, "toClipInput ${now() - _t0} ms")
-
         val halfBuffer = Tensor.allocateHalfBuffer(inputSize)
-        val tA = now()
-        Log.i(TAG, "allocateHalfBuffer(${inputSize}) ${tA - _t0} ms")
-
         for (i in 0 until inputSize) {
             halfBuffer.put(i, floatToHalf(pixels[i]))
         }
-        val tB = now()
-        Log.i(TAG, "half 编码循环 ${tB - tA} ms")
 
-        // 2. 构造输入 tensor 并 forward
+        // 2. 构造输入 tensor 并 forward。
+        //    这里占掉 classify() 几乎全部耗时（实测 19 秒里的 18.98 秒），
+        //    是唯一值得长期保留的计时点；其余环节都是毫秒级，不再逐个打点。
         val inputTensor = Tensor.fromBlob(halfBuffer, inputShape)
-        val tC = now()
-        Log.i(TAG, "fromBlob ${tC - tB} ms")
-
+        val t0 = SystemClock.elapsedRealtime()
         val outputs = module.forward(EValue.from(inputTensor))
-        Log.i(TAG, "module.forward ${now() - tC} ms")
+        Log.i(TAG, "module.forward ${SystemClock.elapsedRealtime() - t0} ms")
         if (outputs.isEmpty()) error("模型未返回任何输出")
 
         // fp16 模型，dataAsFloatArray 由 Tensor_float16 子类实现 fp16→fp32 转换
@@ -102,29 +92,25 @@ class ClipSceneClassifier private constructor(
             "embedding dim=${embedding.size} ≠ $EMBED_DIM（labels.json.embed_dim 不一致）"
         }
 
-        // 3. embedding × label_bank = logits（两边都已 L2 归一化，点积 = 余弦）
+        // 3. embedding × label_bank：两边都已 L2 归一化，点积即余弦相似度。
+        //
+        //    不再做 softmax。它只是单调变换（×正数、exp、÷正常数都不改变排序），
+        //    取第一名和排序的结果与原始余弦完全一致，纯属多余计算。
+        //    而且 softmax 是按「每张图」归一化的，会把另外 38 个标签的表现混进来；
+        //    跨照片比较（同类里谁最匹配）时，原始余弦才是可比的量。
+        //
+        //    副作用：入库分数从概率（0.954）变成余弦（约 0.2~0.4，理论范围 -1~1）。
+        //    仅用于分组和排序，不用于展示「置信度 95%」这类百分比文案。
         val n = labels.size
-        val logits = FloatArray(n)
+        val scores = ArrayList<Pair<String, Float>>(n)
         for (i in 0 until n) {
             var s = 0f
             val base = i * EMBED_DIM
             for (j in 0 until EMBED_DIM) {
                 s += embedding[j] * labelMatrix[base + j]
             }
-            logits[i] = s
+            scores += labels[i].id to s
         }
-
-        // 4. softmax(·logit_scale)。MobileCLIP-S2 训练用 logit_scale ≈ 100（=exp(4.605)）。
-        //    用 log-sum-exp 保证数值稳定。
-        val maxL = logits.max()
-        var sum = 0f
-        for (i in 0 until n) {
-            logits[i] = kotlin.math.exp((logits[i] - maxL) * LOGIT_SCALE)
-            sum += logits[i]
-        }
-        for (i in 0 until n) logits[i] = logits[i] / sum
-
-        val scores = labels.mapIndexed { i, meta -> meta.id to logits[i] }
         return SceneResult(scores)
     }
 
@@ -142,12 +128,6 @@ class ClipSceneClassifier private constructor(
 
         /** labels.json.embed_dim：MobileCLIP-S2 = 512。 */
         private const val EMBED_DIM = 512
-
-        /**
-         * 推理时相似度锐化系数。MobileCLIP-S2 在论文/官方 config 中 logit_scale ≈ 100，
-         * 与此处一致；改这里之前先确认导出脚本侧是否有不同取值。
-         */
-        private const val LOGIT_SCALE = 100f
 
         /** 模型文件是否已经放进 assets。 */
         fun isModelAvailable(context: Context): Boolean = try {
