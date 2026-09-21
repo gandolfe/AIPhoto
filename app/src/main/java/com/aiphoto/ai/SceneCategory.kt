@@ -5,7 +5,7 @@ package com.aiphoto.ai
  *
  * 顺序必须与 [tools/colab_export_clip.py] 中 `LABEL_BANK` 的声明顺序一致：
  * 模型端不会输出概率向量，而是输出 512-d 视觉 embedding；App 侧用
- * embedding × label_bank.bin 做余弦相似度，再 softmax。所以这里的 id 顺序要
+ * embedding × label_bank.bin 做余弦相似度，取最高者。所以这里的 id 顺序要
  * 跟 label_bank.json / label_bank.bin 的行顺序对齐，否则 top-1 选错类别。
  *
  * 运行时不依赖这份硬编码的顺序作为分类依据——真实顺序由 label_bank.json 决定，
@@ -62,9 +62,11 @@ enum class SceneCategory(
     CELEBRATION("celebration", "庆祝", "🎉"),
     SPORTS("sports", "运动", "⚽"),
     TRAVEL("travel", "旅行", "🧳"),
-    // ---- 兜底 ----
-    OTHER("other", "其他", "🖼️"),
     ;
+    // 注：原本有个兜底类 OTHER("other", "其他")，已移除。
+    // 它的 prompt 是 "a photo"，语义太泛，embedding 接近图像分布中心，
+    // 参与竞选会吸走大量有明确内容的照片（实测人物合照/自拍几乎全被它抢走）。
+    // 现在没有兜底类：每张照片都会归入 38 个具体类别中得分最高的一个。
 
     companion object {
         private val byId = entries.associateBy { it.id }

@@ -358,14 +358,6 @@
       ],
       "display_name": "旅行",
       "emoji": "🧳"
-    },
-    {
-      "id": "other",
-      "prompts": [
-        "a photo"
-      ],
-      "display_name": "其他",
-      "emoji": "🖼️"
     }
   ]
 }

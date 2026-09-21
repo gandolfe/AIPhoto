@@ -169,9 +169,14 @@ LABEL_BANK: dict[str, tuple[list[str], str, str]] = {
     "celebration": (["a photo of a celebration", "a photo of a birthday party"], "庆祝", "🎉"),
     "sports":      (["a photo of a sport", "a photo of someone playing sports"], "运动", "⚽"),
     "travel":      (["a travel photo", "a photo from a trip", "a photo of a famous landmark"], "旅行", "🧳"),
-    # ---- 兜底 ----
-    "other":       (["a photo"], "其他", "🖼️"),
 }
+# 注：这里原本有个兜底类 "other": (["a photo"], "其他", "🖼️")，已删除。
+# 原因：它的 prompt 是 "a photo"，语义太泛，文本 embedding 接近图像分布中心，
+# 归一化后与几乎任何图片的余弦都不低，参与竞选会吸走大量有明确内容的照片。
+# 实测：人物合照/自拍大量被判成 other，而 person / portrait 几乎为 0。
+# 删除后 label_bank 由 39 类变为 38 类；已同步 SceneCategory.kt。
+# 若哪天要加回兜底类，不要用泛化 prompt，应改为「最高分低于阈值时判为其他」
+# 的后端判定方式，让兜底类不参与 argmax。
 
 LABEL_ORDER: list[str] = list(LABEL_BANK.keys())
 print(f"label bank size: {len(LABEL_ORDER)}")
