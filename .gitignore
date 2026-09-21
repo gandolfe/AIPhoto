@@ -11,4 +11,3 @@ captures/
 
 # 模型文件体积大，不纳入版本库
 app/src/main/assets/models/*.pte
-app/src/main/assets/models/*.bin
