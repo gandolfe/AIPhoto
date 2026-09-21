@@ -39,11 +39,10 @@ enum class SceneCategory(
     GROUP("group", "合影", "👥"),
     CHILD("child", "儿童", "👶"),
     // ---- 动物 ----
-    CAT("cat", "猫", "🐱"),
-    DOG("dog", "狗", "🐶"),
-    BIRD("bird", "鸟", "🐦"),
-    PET("pet", "宠物", "🐾"),
-    WILDLIFE("wildlife", "野生动物", "🦌"),
+    // 原来是 cat / dog / bird / pet / wildlife 五个细分类，2026-09-21 合并为一类。
+    // 合并方式是直接改 label_bank 向量（5 行平均后 L2 归一化，见 tools/merge_animal.py），
+    // 不是 App 侧后处理；.pte 视觉塔无需重导。
+    ANIMAL("animal", "动物", "🐾"),
     // ---- 食物 ----
     FOOD("food", "美食", "🍽️"),
     DESSERT("dessert", "甜点", "🍰"),
@@ -66,12 +65,23 @@ enum class SceneCategory(
     // 注：原本有个兜底类 OTHER("other", "其他")，已移除。
     // 它的 prompt 是 "a photo"，语义太泛，embedding 接近图像分布中心，
     // 参与竞选会吸走大量有明确内容的照片（实测人物合照/自拍几乎全被它抢走）。
-    // 现在没有兜底类：每张照片都会归入 38 个具体类别中得分最高的一个。
+    // 现在没有兜底类：每张照片都会归入 34 个具体类别中得分最高的一个。
 
     companion object {
         private val byId = entries.associateBy { it.id }
 
-        fun fromId(id: String): SceneCategory? = byId[id]
+        // 旧 id → 新类别的兼容映射。DB 里 2026-09-21 之前入库的结果用的是
+        // 合并前的细分 id（cat/dog/bird/pet/wildlife），不重跑分析也能正确归入
+        // 「动物」显示；新写入的行只会是 "animal"。
+        private val legacyAliases: Map<String, SceneCategory> = mapOf(
+            "cat" to ANIMAL,
+            "dog" to ANIMAL,
+            "bird" to ANIMAL,
+            "pet" to ANIMAL,
+            "wildlife" to ANIMAL,
+        )
+
+        fun fromId(id: String): SceneCategory? = byId[id] ?: legacyAliases[id]
 
         /** 默认类别 ID 顺序，与导出脚本 LABEL_ORDER 保持一致。 */
         val DEFAULT_ORDER: List<String> = entries.map { it.id }

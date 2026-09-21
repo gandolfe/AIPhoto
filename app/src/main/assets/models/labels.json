@@ -15,5 +15,5 @@
   "embed_dim": 512,
   "quantized": false,
   "quant_mode": "fp16",
-  "label_count": 38
+  "label_count": 34
 }

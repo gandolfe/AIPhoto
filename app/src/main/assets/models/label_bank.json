@@ -176,49 +176,21 @@
       "emoji": "👶"
     },
     {
-      "id": "cat",
+      "id": "animal",
       "prompts": [
         "a photo of a cat",
-        "a photo of a kitten"
-      ],
-      "display_name": "猫",
-      "emoji": "🐱"
-    },
-    {
-      "id": "dog",
-      "prompts": [
+        "a photo of a kitten",
         "a photo of a dog",
-        "a photo of a puppy"
-      ],
-      "display_name": "狗",
-      "emoji": "🐶"
-    },
-    {
-      "id": "bird",
-      "prompts": [
+        "a photo of a puppy",
         "a photo of a bird",
-        "a photo of a flying bird"
-      ],
-      "display_name": "鸟",
-      "emoji": "🐦"
-    },
-    {
-      "id": "pet",
-      "prompts": [
+        "a photo of a flying bird",
         "a photo of a pet",
-        "a photo of a pet animal"
-      ],
-      "display_name": "宠物",
-      "emoji": "🐾"
-    },
-    {
-      "id": "wildlife",
-      "prompts": [
+        "a photo of a pet animal",
         "a photo of wildlife",
         "a photo of a wild animal in nature"
       ],
-      "display_name": "野生动物",
-      "emoji": "🦌"
+      "display_name": "动物",
+      "emoji": "🐾"
     },
     {
       "id": "food",

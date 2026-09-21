@@ -20,14 +20,14 @@ import java.nio.ByteBuffer
  *
  * 架构：
  *   1. 视觉塔 .pte：输入 [1, 3, 256, 256] fp16，归一化图像 → 输出 [1, 512] L2 归一化 embedding
- *   2. label_bank.bin / label_bank.json：39 个类别 id 的 L2 归一化文本向量 + 元数据
+ *   2. label_bank.bin / label_bank.json：34 个类别 id 的 L2 归一化文本向量 + 元数据
  *   3. App 侧：embedding × label_bank → 余弦相似度（点积）→ 乘 logit_scale 后 softmax
  *
  * 使用前提（与 [PLACE_MODEL_HERE] 一致）：
  *   app/src/main/assets/models/
  *     - clip_scene.pte     （Cell 5 产物）
- *     - label_bank.bin     （Cell 8 产物，[N, 512] float32 = 39×512×4 = 79872 字节）
- *     - label_bank.json    （Cell 8 产物，39 条 id / prompts / 中文名 / emoji）
+ *     - label_bank.bin     （Cell 8 产物，[N, 512] float32，当前 N=34 → 69632 字节）
+ *     - label_bank.json    （Cell 8 产物，34 条 id / prompts / 中文名 / emoji）
  *     - labels.json        （Cell 8 产物，模型元数据，仅用于校验）
  *
  * 线程安全：ExecuTorch Module 不保证并发安全，调用方需保证串行调用

@@ -146,11 +146,17 @@ LABEL_BANK: dict[str, tuple[list[str], str, str]] = {
     "group":       (["a photo of a group of people", "a group photo of friends"], "合影", "👥"),
     "child":       (["a photo of a child", "a photo of a kid", "a photo of a baby"], "儿童", "👶"),
     # ---- 动物 ----
-    "cat":         (["a photo of a cat", "a photo of a kitten"], "猫", "🐱"),
-    "dog":         (["a photo of a dog", "a photo of a puppy"], "狗", "🐶"),
-    "bird":        (["a photo of a bird", "a photo of a flying bird"], "鸟", "🐦"),
-    "pet":         (["a photo of a pet", "a photo of a pet animal"], "宠物", "🐾"),
-    "wildlife":    (["a photo of wildlife", "a photo of a wild animal in nature"], "野生动物", "🦌"),
+    # 2026-09-21 把 cat/dog/bird/pet/wildlife 五类合并为 animal。
+    # 线上 assets 里的 label_bank 是用 tools/merge_animal.py 就地合并的
+    # （5 行向量平均后 L2 归一化），没有重跑本脚本；这里的 prompts 取原
+    # 五类 prompt 的并集（共 10 条），重导出的向量与就地合并结果语义等价
+    # （归一化顺序略有差异：这里是先 normalize 各 prompt 再平均，就地合并是
+    # 先平均 5 个已归一化的类向量再归一化，实测差异可忽略）。
+    "animal":     (["a photo of a cat", "a photo of a kitten",
+                    "a photo of a dog", "a photo of a puppy",
+                    "a photo of a bird", "a photo of a flying bird",
+                    "a photo of a pet", "a photo of a pet animal",
+                    "a photo of wildlife", "a photo of a wild animal in nature"], "动物", "🐾"),
     # ---- 食物 ----
     "food":        (["a photo of food", "a photo of a meal", "a photo of a dish on a plate"], "美食", "🍽️"),
     "dessert":     (["a photo of a dessert", "a photo of a cake", "a photo of pastries"], "甜点", "🍰"),
