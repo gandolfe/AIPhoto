@@ -1,0 +1,88 @@
+app/src/main/assets/models/ —— 模型文件放置说明
+=====================================================================
+
+把 Colab 导出产物（aiphoto_clip_model.zip 解压后）放进本目录。
+
+---------------------------------------------------------------------
+【全部 4 个都要替换】
+---------------------------------------------------------------------
+
+1) clip_scene.pte          MobileCLIP-S2 视觉塔，Cell 5 产物
+      fp16 ≈ 70 MB（推荐，当前导出默认）
+      int8 ≈ 36 MB
+      fp32 ≈ 143 MB
+   输入： [1, 3, 256, 256] fp16 像素（不要再除以 255 之外的任何 mean/std）
+   输出： [1, 512] L2 归一化后的 embedding
+
+2) labels.json             Cell 8 模型元数据，约 250 B
+   App 启动时校验 image_size / embed_dim / label_count 与 label_bank 是否一致，
+   三个任一对不上都会直接抛 IllegalStateException——避免静默退化。
+
+3) label_bank.bin          Cell 8 产物，约 78 KB（39 × 512 × 4 字节 float32）
+   App 启动时一次性读入内存；行优先 [N, 512] float32，小端字节序。
+
+4) label_bank.json         Cell 8 产物，约 7.5 KB
+   39 条标签元数据 {id, prompts, display_name, emoji}，顺序必须与 label_bank.bin 行序一致。
+   App 用这个文件决定类别 id 顺序与显示名/emoji。
+
+---------------------------------------------------------------------
+【替换步骤】
+---------------------------------------------------------------------
+
+1. Colab 按 Cell 顺序跑完 1 ~ 8，下载 aiphoto_clip_model.zip
+2. 解压，把 4 个文件覆盖到本目录同名文件
+3. Android Studio：Build → Run
+4. 时间线页 →「AI 分析」→ 看 logcat（过滤 ClipSceneClassifier），应出现：
+
+      加载模型 .../files/models/clip_scene.pte (70 MB)，类别=39
+
+   类别数 = 39 与 Colab LABEL_ORDER.length 一致即算接上。
+
+   .pte 文件大小变了，App 会自动重新拷贝到 filesDir/models/
+   （按未压缩长度比对，不一致就重拷），label_bank 直接覆盖下次启动生效。
+
+---------------------------------------------------------------------
+【缺失会怎样】
+---------------------------------------------------------------------
+
+- 缺 clip_scene.pte
+    不崩溃。App 正常启动、按时间浏览图片照旧；点「AI 分析」提示
+    "未找到模型，请把 clip_scene.pte 放入 app/src/main/assets/models/"
+
+- 缺 label_bank.bin 或 label_bank.json
+    启动时 ClipSceneClassifier.create() 抛 IllegalStateException，
+    logcat 里能看到 "label_bank 为空 / 截断 / dim 不一致" 之类。
+    「AI 分析」按钮点了不会有反应（被 SceneAnalyzer 静默吞了），
+    排查时优先来这里看。
+
+- labels.json 与 label_bank 不一致（label_count / embed_dim / image_size 任一）
+    同上，抛 IllegalStateException 启动失败。
+
+---------------------------------------------------------------------
+【换模型前的硬约束】
+---------------------------------------------------------------------
+
+想换其他 CLIP 模型（openai ViT-B/32、SigLIP 等）之前，下面 3 处必须同时改：
+
+  • ImagePreprocessor.INPUT_SIZE  ← labels.json.image_size
+  • ClipSceneClassifier.EMBED_DIM  ← labels.json.embed_dim
+  • ClipSceneClassifier.LOGIT_SCALE  ← 模型 card 上的 logit_scale（CLIP 100 / SigLIP ≈ 100）
+
+只改 .pte 不改上面三项，结果会整体崩坏且不报错。
+
+---------------------------------------------------------------------
+【当前目录里的旧产物】
+---------------------------------------------------------------------
+
+替换前目录里是 2026-09-18 的旧产物：
+  clip_scene.pte  335 MB    openai/clip-vit-base-patch32，输出概率向量
+  labels.json    176 B       老的 5 类别清单
+（label_bank.* 不存在）
+
+换成 MobileCLIP-S2 产物时，这 4 个文件全部覆盖即可，旧产物会被新产物替换掉。
+
+构建配置：app/build.gradle.kts 里已设 noCompress += "pte"，
+.pte 不压缩打包，运行时按 MMAP 加载（不一次性占满内存）。
+label_bank.bin/json 体量小，AAPT 是否压缩无影响，启动时按需读。
+
+导出脚本与全部步骤见 tools/colab_export_clip.py 顶部注释。

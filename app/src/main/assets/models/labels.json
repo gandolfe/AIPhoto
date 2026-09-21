@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "model": "mobileclip_s1",
+  "image_size": 256,
+  "image_mean": [
+    0.0,
+    0.0,
+    0.0
+  ],
+  "image_std": [
+    1.0,
+    1.0,
+    1.0
+  ],
+  "embed_dim": 512,
+  "quantized": false,
+  "quant_mode": "fp16",
+  "label_count": 39
+}

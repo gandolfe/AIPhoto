@@ -1,0 +1,371 @@
+{
+  "version": 1,
+  "model": "mobileclip_s1",
+  "embed_dim": 512,
+  "labels": [
+    {
+      "id": "scenery",
+      "prompts": [
+        "a photo of scenery",
+        "a photo of a landscape",
+        "a beautiful landscape photo"
+      ],
+      "display_name": "风景",
+      "emoji": "🏞️"
+    },
+    {
+      "id": "mountain",
+      "prompts": [
+        "a photo of mountains",
+        "a photo of a mountain peak",
+        "a photo of snow-capped mountains"
+      ],
+      "display_name": "山景",
+      "emoji": "⛰️"
+    },
+    {
+      "id": "beach",
+      "prompts": [
+        "a photo of a beach",
+        "a photo of the seaside",
+        "ocean waves at the shore"
+      ],
+      "display_name": "海边",
+      "emoji": "🏖️"
+    },
+    {
+      "id": "sunset",
+      "prompts": [
+        "a photo of a sunset",
+        "a photo of a sunrise",
+        "a colorful sky at sunset"
+      ],
+      "display_name": "日出日落",
+      "emoji": "🌅"
+    },
+    {
+      "id": "forest",
+      "prompts": [
+        "a photo of a forest",
+        "a photo of trees in a woods"
+      ],
+      "display_name": "森林",
+      "emoji": "🌲"
+    },
+    {
+      "id": "flowers",
+      "prompts": [
+        "a photo of a flower garden",
+        "a photo of flowers blooming"
+      ],
+      "display_name": "花卉",
+      "emoji": "🌷"
+    },
+    {
+      "id": "lake",
+      "prompts": [
+        "a photo of a lake",
+        "a photo of a calm river"
+      ],
+      "display_name": "湖景",
+      "emoji": "🏞️"
+    },
+    {
+      "id": "snow",
+      "prompts": [
+        "a photo of snow",
+        "a photo of a snowy landscape"
+      ],
+      "display_name": "雪景",
+      "emoji": "❄️"
+    },
+    {
+      "id": "sky",
+      "prompts": [
+        "a photo of the sky",
+        "a photo of clouds",
+        "a blue sky with clouds"
+      ],
+      "display_name": "天空",
+      "emoji": "☁️"
+    },
+    {
+      "id": "cityscape",
+      "prompts": [
+        "a photo of a city skyline",
+        "a photo of city buildings at night",
+        "an urban skyline"
+      ],
+      "display_name": "城市",
+      "emoji": "🏙️"
+    },
+    {
+      "id": "building",
+      "prompts": [
+        "a photo of a building",
+        "a photo of architecture",
+        "a photo of a house"
+      ],
+      "display_name": "建筑",
+      "emoji": "🏛️"
+    },
+    {
+      "id": "interior",
+      "prompts": [
+        "a photo of an interior",
+        "a photo of a room inside a house"
+      ],
+      "display_name": "室内",
+      "emoji": "🛋️"
+    },
+    {
+      "id": "street",
+      "prompts": [
+        "a photo of a street scene",
+        "a photo of a road in a city"
+      ],
+      "display_name": "街景",
+      "emoji": "🛣️"
+    },
+    {
+      "id": "night",
+      "prompts": [
+        "a photo at night",
+        "a night scene",
+        "city lights at night"
+      ],
+      "display_name": "夜景",
+      "emoji": "🌃"
+    },
+    {
+      "id": "person",
+      "prompts": [
+        "a photo of a person",
+        "a photo of people",
+        "a portrait of a human"
+      ],
+      "display_name": "人物",
+      "emoji": "👤"
+    },
+    {
+      "id": "portrait",
+      "prompts": [
+        "a portrait photo of a person",
+        "a close-up photo of a face"
+      ],
+      "display_name": "肖像",
+      "emoji": "🧑"
+    },
+    {
+      "id": "group",
+      "prompts": [
+        "a photo of a group of people",
+        "a group photo of friends"
+      ],
+      "display_name": "合影",
+      "emoji": "👥"
+    },
+    {
+      "id": "child",
+      "prompts": [
+        "a photo of a child",
+        "a photo of a kid",
+        "a photo of a baby"
+      ],
+      "display_name": "儿童",
+      "emoji": "👶"
+    },
+    {
+      "id": "cat",
+      "prompts": [
+        "a photo of a cat",
+        "a photo of a kitten"
+      ],
+      "display_name": "猫",
+      "emoji": "🐱"
+    },
+    {
+      "id": "dog",
+      "prompts": [
+        "a photo of a dog",
+        "a photo of a puppy"
+      ],
+      "display_name": "狗",
+      "emoji": "🐶"
+    },
+    {
+      "id": "bird",
+      "prompts": [
+        "a photo of a bird",
+        "a photo of a flying bird"
+      ],
+      "display_name": "鸟",
+      "emoji": "🐦"
+    },
+    {
+      "id": "pet",
+      "prompts": [
+        "a photo of a pet",
+        "a photo of a pet animal"
+      ],
+      "display_name": "宠物",
+      "emoji": "🐾"
+    },
+    {
+      "id": "wildlife",
+      "prompts": [
+        "a photo of wildlife",
+        "a photo of a wild animal in nature"
+      ],
+      "display_name": "野生动物",
+      "emoji": "🦌"
+    },
+    {
+      "id": "food",
+      "prompts": [
+        "a photo of food",
+        "a photo of a meal",
+        "a photo of a dish on a plate"
+      ],
+      "display_name": "美食",
+      "emoji": "🍽️"
+    },
+    {
+      "id": "dessert",
+      "prompts": [
+        "a photo of a dessert",
+        "a photo of a cake",
+        "a photo of pastries"
+      ],
+      "display_name": "甜点",
+      "emoji": "🍰"
+    },
+    {
+      "id": "drink",
+      "prompts": [
+        "a photo of a drink",
+        "a photo of a cup of coffee or tea"
+      ],
+      "display_name": "饮品",
+      "emoji": "🥤"
+    },
+    {
+      "id": "fruit",
+      "prompts": [
+        "a photo of fruit",
+        "a photo of fresh fruits"
+      ],
+      "display_name": "水果",
+      "emoji": "🍎"
+    },
+    {
+      "id": "document",
+      "prompts": [
+        "a photo of a document",
+        "a screenshot of text"
+      ],
+      "display_name": "文档",
+      "emoji": "📄"
+    },
+    {
+      "id": "screen",
+      "prompts": [
+        "a photo of a computer screen",
+        "a screenshot of an interface"
+      ],
+      "display_name": "屏幕截图",
+      "emoji": "🖥️"
+    },
+    {
+      "id": "art",
+      "prompts": [
+        "a photo of a painting",
+        "a photo of artwork",
+        "a photo of a drawing"
+      ],
+      "display_name": "艺术",
+      "emoji": "🎨"
+    },
+    {
+      "id": "toy",
+      "prompts": [
+        "a photo of a toy",
+        "a photo of a stuffed animal"
+      ],
+      "display_name": "玩具",
+      "emoji": "🧸"
+    },
+    {
+      "id": "book",
+      "prompts": [
+        "a photo of a book",
+        "a photo of books on a shelf"
+      ],
+      "display_name": "书籍",
+      "emoji": "📚"
+    },
+    {
+      "id": "plant",
+      "prompts": [
+        "a photo of a houseplant",
+        "a photo of a potted plant"
+      ],
+      "display_name": "植物",
+      "emoji": "🪴"
+    },
+    {
+      "id": "car",
+      "prompts": [
+        "a photo of a car",
+        "a photo of a vehicle"
+      ],
+      "display_name": "汽车",
+      "emoji": "🚗"
+    },
+    {
+      "id": "wedding",
+      "prompts": [
+        "a photo of a wedding",
+        "a wedding photo"
+      ],
+      "display_name": "婚礼",
+      "emoji": "💒"
+    },
+    {
+      "id": "celebration",
+      "prompts": [
+        "a photo of a celebration",
+        "a photo of a birthday party"
+      ],
+      "display_name": "庆祝",
+      "emoji": "🎉"
+    },
+    {
+      "id": "sports",
+      "prompts": [
+        "a photo of a sport",
+        "a photo of someone playing sports"
+      ],
+      "display_name": "运动",
+      "emoji": "⚽"
+    },
+    {
+      "id": "travel",
+      "prompts": [
+        "a travel photo",
+        "a photo from a trip",
+        "a photo of a famous landmark"
+      ],
+      "display_name": "旅行",
+      "emoji": "🧳"
+    },
+    {
+      "id": "other",
+      "prompts": [
+        "a photo"
+      ],
+      "display_name": "其他",
+      "emoji": "🖼️"
+    }
+  ]
+}
