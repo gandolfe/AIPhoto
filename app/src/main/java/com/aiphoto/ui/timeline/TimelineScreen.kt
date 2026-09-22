@@ -70,7 +70,7 @@ fun TimelineScreen(
                 else -> {
                     PhotoGrid(
                         photos = photos,
-                        columns = 3,
+                        columns = 4,
                         state = gridState,
                         onNearEnd = viewModel::loadMore,
                     )

@@ -71,17 +71,19 @@ class ClipSceneClassifier private constructor(
      */
     fun classify(bitmap: Bitmap): SceneResult {
         // 1. fp32 [1,3,H,W] → ShortBuffer (IEEE half)
+        val t0 = SystemClock.elapsedRealtime()
         val pixels = ImagePreprocessor.toClipInput(bitmap)
         val halfBuffer = Tensor.allocateHalfBuffer(inputSize)
         for (i in 0 until inputSize) {
             halfBuffer.put(i, floatToHalf(pixels[i]))
         }
+        Log.i(TAG, "pre forward ${SystemClock.elapsedRealtime() - t0} ms")
 
         // 2. 构造输入 tensor 并 forward。
         val inputTensor = Tensor.fromBlob(halfBuffer, inputShape)
-        val t0 = SystemClock.elapsedRealtime()
+        val t1 = SystemClock.elapsedRealtime()
         val outputs = module.forward(EValue.from(inputTensor))
-        Log.i(TAG, "module.forward ${SystemClock.elapsedRealtime() - t0} ms")
+        Log.i(TAG, "module.forward ${SystemClock.elapsedRealtime() - t1} ms")
         if (outputs.isEmpty()) error("模型未返回任何输出")
 
         // fp16 模型，dataAsFloatArray 由 Tensor_float16 子类实现 fp16→fp32 转换

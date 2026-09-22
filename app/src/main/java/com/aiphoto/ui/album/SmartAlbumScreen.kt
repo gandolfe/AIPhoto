@@ -195,7 +195,7 @@ private fun CategoryDetail(
                 }
 
                 else -> {
-                    PhotoGrid(photos = photos, columns = 3)
+                    PhotoGrid(photos = photos, columns = 4)
                 }
             }
         }
