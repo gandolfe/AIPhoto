@@ -78,8 +78,6 @@ class ClipSceneClassifier private constructor(
         }
 
         // 2. 构造输入 tensor 并 forward。
-        //    这里占掉 classify() 几乎全部耗时（实测 19 秒里的 18.98 秒），
-        //    是唯一值得长期保留的计时点；其余环节都是毫秒级，不再逐个打点。
         val inputTensor = Tensor.fromBlob(halfBuffer, inputShape)
         val t0 = SystemClock.elapsedRealtime()
         val outputs = module.forward(EValue.from(inputTensor))
@@ -93,14 +91,6 @@ class ClipSceneClassifier private constructor(
         }
 
         // 3. embedding × label_bank：两边都已 L2 归一化，点积即余弦相似度。
-        //
-        //    不再做 softmax。它只是单调变换（×正数、exp、÷正常数都不改变排序），
-        //    取第一名和排序的结果与原始余弦完全一致，纯属多余计算。
-        //    而且 softmax 是按「每张图」归一化的，会把另外 38 个标签的表现混进来；
-        //    跨照片比较（同类里谁最匹配）时，原始余弦才是可比的量。
-        //
-        //    副作用：入库分数从概率（0.954）变成余弦（约 0.2~0.4，理论范围 -1~1）。
-        //    仅用于分组和排序，不用于展示「置信度 95%」这类百分比文案。
         val n = labels.size
         val scores = ArrayList<Pair<String, Float>>(n)
         for (i in 0 until n) {

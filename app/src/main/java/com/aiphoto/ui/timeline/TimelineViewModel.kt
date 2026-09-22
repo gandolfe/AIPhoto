@@ -90,8 +90,6 @@ class TimelineViewModel(application: Application) : AndroidViewModel(application
 
             for ((index, photo) in pending.withIndex()) {
                 // 每张开始前就先把状态推给 UI。单张推理可能耗时数分钟，
-                // 若按批刷新，界面会长时间静止，看起来像卡死（实测过：
-                // 只有 2 张待分析时，旧的「每 3 张刷新一次」会全程不更新）。
                 _analysis.value = _analysis.value.copy(
                     done = done,
                     failed = failed,

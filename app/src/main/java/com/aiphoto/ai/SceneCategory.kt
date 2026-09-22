@@ -62,10 +62,6 @@ enum class SceneCategory(
     SPORTS("sports", "运动", "⚽"),
     TRAVEL("travel", "旅行", "🧳"),
     ;
-    // 注：原本有个兜底类 OTHER("other", "其他")，已移除。
-    // 它的 prompt 是 "a photo"，语义太泛，embedding 接近图像分布中心，
-    // 参与竞选会吸走大量有明确内容的照片（实测人物合照/自拍几乎全被它抢走）。
-    // 现在没有兜底类：每张照片都会归入 34 个具体类别中得分最高的一个。
 
     companion object {
         private val byId = entries.associateBy { it.id }

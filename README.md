@@ -37,9 +37,6 @@ Android 相册应用，用 **MobileCLIP-S1 + ExecuTorch** 在端侧完成照片�
 | `label_bank.json` | Cell 8 | 39 条 id / prompts / 中文名 / emoji |
 | `labels.json` | Cell 8 | 元数据，启动时用于校验 |
 
-`clip_scene_portable.pte`（不带 XNNPACK）默认**不再导出**，见下文「XNNPACK 的取舍」。
-放置细节另见 `app/src/main/assets/models/PLACE_MODEL_HERE.txt`。
-
 `build.gradle.kts` 里 `noCompress += "pte"`，保证 `.pte` 以 stored 方式打包，
 App 才能用 `openFd()` 拿到真实长度并直接 mmap。
 
@@ -96,10 +93,7 @@ adb install -r -g app\build\outputs\apk\debug\app-debug.apk
 其余环节耗时（供排查参考）：`Module.load` 13 ms、`toClipInput` 3~19 ms、
 half 编码 12~45 ms、读图解码 45~49 ms。瓶颈始终在 `module.forward`。
 
-**XNNPACK 的取舍**：它会把委托块的权重摊成内部 fp32，让 `.pte` 涨约 33 MB，
-但换来约 **73 倍**提速。这个交换非常划算，**正式产物用 `clip_scene.pte`（带 XNNPACK）**。
-只有换了新模型、怀疑 XNNPACK 拖慢时，才把 `EXPORT_PORTABLE_BASELINE` 打开，
-导出两份上真机对比 `[基线对照]` 的输出。
+**XNNPACK 的取舍**：它会把委托块的权重摊成内部 fp32，让 `.pte` 涨约 33 MB
 
 ## 已知坑
 
@@ -121,12 +115,7 @@ if (mantissa == 0) {
 黑色像素归一化后正好是 `0.0f`，**任何一张图都会触发**。
 表现为：CPU 100% 空转、进度永远停在 0、三个体积不同的模型表现完全一致。
 
-**2. vivo 手机默认抓不到 App 日志**
-
-`logcat --pid=<pid>` 返回空，需要在开发者选项里打开日志调试开关。
-排查前先确认能抓到 `ClipSceneClassifier` 这个 tag，否则只能靠截图和 sqlite 猜。
-
-**3. 已分析过的照片会被跳过**
+**2. 已分析过的照片会被跳过**
 
 `TimelineViewModel.startAnalysis()` 里 `pending = all.filter { it.id !in analyzed }`。
 换模型后旧结果不兼容（旧模型 5 类，新模型 39 类），需要先用界面上的
