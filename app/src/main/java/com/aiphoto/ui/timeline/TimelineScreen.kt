@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
@@ -37,8 +38,13 @@ fun TimelineScreen(
 ) {
     val photos by viewModel.photos.collectAsStateWithLifecycle()
     val loading by viewModel.loading.collectAsStateWithLifecycle()
+    val loadingMore by viewModel.loadingMore.collectAsStateWithLifecycle()
+    val fullyLoaded by viewModel.fullyLoaded.collectAsStateWithLifecycle()
     val analysis by viewModel.analysis.collectAsStateWithLifecycle()
     val analyzedIds by viewModel.analyzedIds.collectAsStateWithLifecycle()
+
+    // 网格状态由父级持有，滚动到底部时触发翻页（向上回滚已加载的页是瞬时的）
+    val gridState = rememberLazyGridState()
 
     Column(modifier = modifier.fillMaxSize()) {
         AnalysisHeader(
@@ -62,7 +68,19 @@ fun TimelineScreen(
                 }
 
                 else -> {
-                    PhotoGrid(photos = photos, columns = 3)
+                    PhotoGrid(
+                        photos = photos,
+                        columns = 3,
+                        state = gridState,
+                        onNearEnd = viewModel::loadMore,
+                    )
+                    // 仅在实际拉取下一页时显示转圈；本地相册不会持续更新内容，
+                    // 不显示“加载更多”之类的提示文字，避免误导成信息流式的新内容
+                    if (loadingMore) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 16.dp),
+                        )
+                    }
                 }
             }
         }

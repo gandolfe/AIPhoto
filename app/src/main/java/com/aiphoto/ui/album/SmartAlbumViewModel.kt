@@ -40,6 +40,11 @@ class SmartAlbumViewModel(application: Application) : AndroidViewModel(applicati
                 if (photoStore.photos.value.isEmpty()) {
                     photoStore.refresh()
                 }
+                // 翻页后未滚到的图片不在内存索引里，这里先把全部图片加载完，
+                // 否则 byIds 会漏掉那些还没滚动触发的图片
+                if (!photoStore.fullyLoaded.value) {
+                    photoStore.ensureAllLoaded()
+                }
                 val ids = tagDao.photoIdsByCategory(categoryId)
                 _categoryPhotos.value = photoStore.byIds(ids)
             } finally {

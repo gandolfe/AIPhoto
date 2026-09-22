@@ -6,11 +6,15 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
@@ -24,8 +28,26 @@ fun PhotoGrid(
     photos: List<MediaImage>,
     modifier: Modifier = Modifier,
     columns: Int = 3,
+    // 由调用方持有，便于滚动到底部时触发翻页；不传则内部自己建
+    state: LazyGridState = rememberLazyGridState(),
+    // 接近列表末尾时回调（用于加载下一页），留空则不触发翻页
+    onNearEnd: (() -> Unit)? = null,
 ) {
+    // 滚动接近末尾（距最后 30 个格子内）时触发翻页；loadMore 自身会去重/防到底，
+    // 所以这里频繁回调也无副作用。
+    LaunchedEffect(state, onNearEnd) {
+        if (onNearEnd == null) return@LaunchedEffect
+        snapshotFlow { state.layoutInfo }
+            .collect { info ->
+                val last = info.visibleItemsInfo.lastOrNull()?.index ?: 0
+                if (last >= info.totalItemsCount - 30) {
+                    onNearEnd()
+                }
+            }
+    }
+
     LazyVerticalGrid(
+        state = state,
         columns = GridCells.Fixed(columns),
         modifier = modifier.fillMaxSize(),
         contentPadding = PaddingValues(4.dp),

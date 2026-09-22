@@ -35,6 +35,8 @@ class TimelineViewModel(application: Application) : AndroidViewModel(application
 
     val photos: StateFlow<List<MediaImage>> = photoStore.photos
     val loading: StateFlow<Boolean> = photoStore.loading
+    val loadingMore: StateFlow<Boolean> = photoStore.loadingMore
+    val fullyLoaded: StateFlow<Boolean> = photoStore.fullyLoaded
 
     private val _analysis = MutableStateFlow(AnalysisState())
     val analysis: StateFlow<AnalysisState> = _analysis.asStateFlow()
@@ -68,6 +70,9 @@ class TimelineViewModel(application: Application) : AndroidViewModel(application
                 )
                 return@launch
             }
+
+            // 翻页加载可能还没滚到的图片，保证分析覆盖相册全部图片
+            photoStore.ensureAllLoaded()
 
             val all = photoStore.photos.value
             if (all.isEmpty()) {
@@ -151,6 +156,12 @@ class TimelineViewModel(application: Application) : AndroidViewModel(application
 
     fun dismissMessage() {
         _analysis.value = _analysis.value.copy(message = null)
+    }
+
+    /** 滚动到底部时由 UI 触发，加载下一页图片。已到底/正在加载时直接忽略。 */
+    fun loadMore() {
+        if (photoStore.loadingMore.value || photoStore.fullyLoaded.value) return
+        viewModelScope.launch { photoStore.loadMore() }
     }
 
     private companion object {
