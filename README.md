@@ -1,137 +1,101 @@
 # AIPhoto
 
-Android 相册应用，用 **MobileCLIP-S1 + ExecuTorch** 在端侧完成照片场景分类。
-全程本地推理，不联网、不上传。
+Android 端侧 AI 相册：按**场景**分类照片、按**人物**聚合人脸。
+所有推理都在手机本地完成，不联网、不上传。
 
-## 它怎么工作
+## 技术栈
+
+| 领域    | 选型 |
+|-------|---|
+| UI    | Jetpack Compose + Material3，单 Activity + 底部导航 |
+| 异步    | Kotlin Coroutines / Flow |
+| 数据    | Room（SQLite）+ MediaStore |
+| 依赖注入  | 手写 `AppContainer`（项目规模下不引入 Hilt） |
+| 图片加载  | Coil |
+| 端侧推理  | **ExecuTorch**（`executorch-android`，XNNPACK 后端，加载 `.pte`） |
+| 人脸框检测 | **MediaPipe Tasks Vision**（`tasks-vision`，加载 `.tflite`） |
+| 模型导出  | PyTorch `torch.export` → ExecuTorch（脚本在 `tools/`，Colab 跑） |
+
+## 整体架构
 
 ```
-照片 → 缩放 256×256 → fp16 张量
-     → MobileCLIP-S1 视觉塔 (.pte) → 512 维 L2 归一化 embedding
-     → 端侧 与 label_bank 做点积（等于余弦相似度）
-     → softmax(logit_scale · sim) → 39 类概率
+ui/         界面层：Compose 画面 + ViewModel（持有进度/结果状态）
+   ↓
+ai/         推理层：模型加载、预处理、forward、聚类
+   ↓
+data/       数据层：MediaStore 读图、Room 落库、内存图片索引
+```
+
+三个 tab 对应三块功能：**时间线**（照片流 + 场景分析入口）、**智能相册**（分类浏览）、**人物**（人脸聚合）。
+
+### 分层职责
+
+| 包 | 职责 |
+|---|---|
+| `ui/` | 页面与 ViewModel；批量分析的进度推进、已分析去重 |
+| `ai/` | 模型封装与推理编排；**不含 UI、不直接写库** |
+| `data/` | `MediaImage` / `PhotoStore`（内存索引、分页）/ Room 实体与 DAO |
+| `AppContainer` | 全局单例，持有 Store、DAO、Analyzer |
+
+### 两个贯穿全局的设计
+
+1. **推理不并发**：`ExecuTorch Module` 非线程安全，每个链路各用一个**单线程 dispatcher** 串行执行（场景用 `clip-inference`，人脸用 `face-inference`，互不抢资源）。
+2. **`.pte` 只出 embedding，决策在 Kotlin 侧**：模型负责把图编成向量，分类/聚类/排序都在 App 里算。所以**换标签或调聚类阈值不用重新导出模型**。
+
+## 两条推理链路
+
+### 1. 场景分类
+
+```
+图片 → 缩放 256×256 → fp16 张量 → MobileCLIP 视觉塔(.pte)
+     → 512 维 embedding → 与 label_bank 点积(即余弦) → softmax → 34 类
      → 写入 Room (photo_tags)
 ```
 
-分类决策在 Kotlin 侧完成，`.pte` 只负责把图像编码成 embedding。
-因此**换标签不需要重新导出模型**，只换 `label_bank.bin` / `label_bank.json` 即可。
+### 2. 人物聚合
 
-关键代码：
+```
+图片 → MediaPipe 检出人脸框 → 按框裁出人脸(扩边 25%)
+     → MobileFaceNet(.pte) → 512 维 embedding
+     → 与已有簇质心比余弦，超阈值归簇、否则新建簇（增量聚类 O(n·k)）
+     → 写入 Room (face_tags / people)
+```
 
-| 文件 | 职责 |
-|---|---|
-| `ai/ClipSceneClassifier.kt` | 加载 `.pte`、fp16 编码、forward、embedding × label_bank、softmax |
-| `ai/ImagePreprocessor.kt` | 缩放 / 归一化 / CHW 排列 |
-| `ai/SceneAnalyzer.kt` | 单线程串行调度（ExecuTorch Module 非并发安全） |
-| `data/PhotoTagDao.kt` | 结果读写 |
-| `tools/colab_export_clip.py` | 模型导出 |
+聚类用增量方式而非「最后两两比较」——几千张脸两两比是 O(n²)，端侧不可接受。
 
-## 模型产物
+## 模型文件
 
-放在 `app/src/main/assets/models/`，共 4 个文件：
+放 `app/src/main/assets/models/`（缺文件时对应功能会提示「未找到模型」而非崩溃）：
 
-| 文件 | 来源 | 说明 |
+| 文件 | 用途 | 来源 |
 |---|---|---|
-| `clip_scene.pte` | Cell 5 | **带 XNNPACK**，正式用这个 |
-| `label_bank.bin` | Cell 8 | `[39, 512]` float32 小端，39×512×4 = 79872 字节 |
-| `label_bank.json` | Cell 8 | 39 条 id / prompts / 中文名 / emoji |
-| `labels.json` | Cell 8 | 元数据，启动时用于校验 |
+| `clip_scene.pte` | 场景编码 | `tools/colab_export_clip.py` |
+| `labels.json` / `label_bank.json` / `label_bank.bin` | 类别元数据与标签向量 | 同上 |
+| `face_detector.tflite` | MediaPipe 人脸检测 | BlazeFace short range |
+| `mobilefacenet.pte` + `mobilefacenet.json` | 人脸特征提取与元数据 | `tools/colab_export_mobilefacenet.py` |
 
-`build.gradle.kts` 里 `noCompress += "pte"`，保证 `.pte` 以 stored 方式打包，
-App 才能用 `openFd()` 拿到真实长度并直接 mmap。
+`build.gradle.kts` 里对 `pte` / `tflite` / `task` 配了 `noCompress`，保证模型未被压缩（MediaPipe 要求；`.pte` 也依赖它才能 `openFd` + mmap）。
 
-## 导出模型
+## 构建运行
 
-Colab 新建 notebook，按 `tools/colab_export_clip.py` 的 Cell 顺序运行（推荐 CPU 运行时）。
-
-```
-MODEL_ID  = "mobileclip_s1"
-MODEL_REF = "hf-hub:apple/MobileCLIP-S1-OpenCLIP"
-MODE      = "fp16"        # fp16 | int8 | fp32
-EXPORT_PORTABLE_BASELINE = False
-```
-
-导出后脚本会打印参数量、dtype、XNNPACK 委托覆盖率、落回 portable 的算子清单
-（另落盘 `xnnpack_audit.txt`），并打包下载 `aiphoto_clip_model.zip`。
-
-**换模型时必须核对两个值**，否则端侧会静默出错：
-
-```
-model.visual.image_size == 256  → 改 ImagePreprocessor.INPUT_SIZE
-model.embed_dim         == 512  → 改 ClipSceneClassifier.EMBED_DIM
-```
-
-S1 的 `open_clip_config.json` 实测为 `image_size=256`、`embed_dim=512`，与当前 App 常量一致。
-
-想用更小的 MobileCLIP-S0 需要先解决权重格式问题，见脚本末尾注释。
-
-## 编译运行
-
-AGP 8.7.3 要求 **JDK ≥ 11**。若终端 PATH 上默认是 Java 8，会报
-`Dependency requires at least JVM runtime version 11`，需要先指定：
+AGP 8.7.3 需 JDK ≥ 11：
 
 ```cmd
 set JAVA_HOME=C:\Program Files\Android\Android Studio1\jbr
 gradlew.bat assembleDebug
-```
-
-安装到真机：
-
-```cmd
 adb install -r -g app\build\outputs\apk\debug\app-debug.apk
 ```
 
-`-g` 会一次性授予全部运行时权限，省去在手机上一一点授权。
+## 几个要点
 
-## 实测性能（真机 vivo V2528A，MobileCLIP-S1，2804 张照片）
-
-| 版本 | `.pte` 体积 | 单张耗时 | 2800 张总计 |
-|---|---|---|---|
-| 纯 portable | 43.6 MB | 19 秒 | 约 14.8 小时 |
-| **带 XNNPACK** | **77.0 MB** | **0.26 秒** | **约 12 分钟** |
-
-其余环节耗时（供排查参考）：`Module.load` 13 ms、`toClipInput` 3~19 ms、
-half 编码 12~45 ms、读图解码 45~49 ms。瓶颈始终在 `module.forward`。
-
-**XNNPACK 的取舍**：它会把委托块的权重摊成内部 fp32，让 `.pte` 涨约 33 MB
-
-## 已知坑
-
-**1. `floatToHalf` 对 `0.0f` 会死循环（已修，别改回去）**
-
-`ClipSceneClassifier.floatToHalf()` 里 `exp == 0` 分支必须写成 if / else 两个分支：
-
-```kotlin
-if (mantissa == 0) {
-    sign.toShort()          // ±0
-} else {
-    while ((v and 0x00800000) == 0) { v = v shl 1; e -= 1 }   // v==0 时恒真
-    ...
-}
-```
-
-`if` 只是语句、不会返回。少了 `else`，`mantissa == 0 && exp == 0`（即 `±0.0`）
-会继续进入归一化循环，而 `v == 0` 时 `v shl 1` 恒为 0，循环永不退出。
-黑色像素归一化后正好是 `0.0f`，**任何一张图都会触发**。
-表现为：CPU 100% 空转、进度永远停在 0、三个体积不同的模型表现完全一致。
-
-**2. 已分析过的照片会被跳过**
-
-`TimelineViewModel.startAnalysis()` 里 `pending = all.filter { it.id !in analyzed }`。
-换模型后旧结果不兼容（旧模型 5 类，新模型 39 类），需要先用界面上的
-**「清空」**按钮清掉历史结果再重新分析，否则只会处理新照片。
-
-**4. 息屏后 vivo 会冻结后台 App**
-
-分析会中途停住。长时间跑批时保持屏幕常亮：
-
-```cmd
-adb shell svc power stayon usb
-```
+- **归一化参数不硬编码**：`image_size` / `mean` / `std` / `embed_dim` 都从模型的 `.json` 元数据读（`labels.json`、`mobilefacenet.json`）。换模型只换文件即可。
+- **数据库有 Migration**：`AppDatabase` 是 v2 且提供了 `Migration(1,2)`。升级版本时必须补迁移，否则 Room 的 `fallbackToDestructiveMigration()` 会**删库重建**、已分析结果全丢。
+- **已分析过的照片会跳过**：换模型后旧结果不兼容，需先用界面上的「清空」清掉再跑。
+- **息屏会被冻结**：vivo 等机型息屏后批量分析会中断，长时间跑批先 `adb shell svc power stayon usb`。
+- **人物聚类阈值**：`FaceClusterer.DEFAULT_THRESHOLD`（默认 0.5，范围 0.4~0.7）。同人被拆成多个就调低，不同人被并成一个就调高。
 
 ## 排查手段
 
-- 计时日志：`ClipSceneClassifier` / `SceneAnalyzer` / `TimelineVM` 三个 tag，
-  按 `loadForAnalysis → Module.load → toClipInput → half 编码 → forward` 分段打印耗时
-- 直接查库：`adb shell run-as com.aiphoto sqlite3 databases/aiphoto.db "select count(*) from photo_tags;"`
-- 已分析文件：`adb shell run-as com.aiphoto ls -l files/models/`
+- 计时日志：`ClipSceneClassifier` / `SceneAnalyzer` / `TimelineVM` / `FaceAnalyzer` / `MobileFaceNet` 各 tag 分段打印耗时
+- 直接查库：`adb shell run-as com.aiphoto sqlite3 databases/aiphoto.db "select count(*) from face_tags;"`
+- 已落盘模型：`adb shell run-as com.aiphoto ls -l files/models/`
