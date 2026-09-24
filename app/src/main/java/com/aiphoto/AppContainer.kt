@@ -1,8 +1,10 @@
 package com.aiphoto
 
 import android.content.Context
+import com.aiphoto.ai.FaceAnalyzer
 import com.aiphoto.ai.SceneAnalyzer
 import com.aiphoto.data.AppDatabase
+import com.aiphoto.data.FaceDao
 import com.aiphoto.data.MediaStoreRepository
 import com.aiphoto.data.PhotoStore
 import com.aiphoto.data.PhotoTagDao
@@ -20,5 +22,10 @@ class AppContainer(context: Context) {
 
     val photoTagDao: PhotoTagDao = AppDatabase.get(appContext).photoTagDao()
 
+    val faceDao: FaceDao = AppDatabase.get(appContext).faceDao()
+
     val sceneAnalyzer: SceneAnalyzer = SceneAnalyzer(appContext)
+
+    // 人脸分析独立实例：内部有自己的单线程 dispatcher，不与 CLIP 抢资源
+    val faceAnalyzer: FaceAnalyzer = FaceAnalyzer(appContext)
 }

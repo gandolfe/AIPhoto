@@ -3,6 +3,14 @@ app/src/main/assets/models/ —— 模型文件放置说明
 
 把 Colab 导出产物（aiphoto_clip_model.zip 解压后）放进本目录。
 
+【人物分类功能额外还需要 3 个文件，缺了「人物」tab 会提示未找到模型】
+    1) face_detector.tflite   MediaPipe 人脸检测（BlazeFace short range）
+       下载：https://storage.googleapis.com/mediapipe-models/face_detector/blaze_face_short_range/float16/1/blaze_face_short_range.tflite
+    2) mobilefacenet.pte      人脸特征提取模型，由 tools/colab_export_mobilefacenet.py 导出
+    3) mobilefacenet.json     同上脚本产出，记录 image_size / mean / std / embed_dim
+       App 侧不硬编码这些参数，全部读这份 json —— 归一化必须与训练一致，
+       否则 embedding 无意义、聚类结果全乱。
+
 ---------------------------------------------------------------------
 【全部 4 个都要替换】
 ---------------------------------------------------------------------

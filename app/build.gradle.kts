@@ -48,9 +48,12 @@ android {
         compose = true
     }
 
-    // .pte 不做压缩，便于直接 mmap 加载
+    // .pte 不做压缩，便于直接 mmap 加载；
+    // .tflite / .task 同理 —— MediaPipe 要求模型文件未被压缩才能直接从 assets 读取
     androidResources {
         noCompress += "pte"
+        noCompress += "tflite"
+        noCompress += "task"
     }
 
     packaging {
@@ -92,6 +95,8 @@ dependencies {
     implementation(libs.androidx.datastore.preferences)
 
     implementation(libs.executorch.android)
+    // MediaPipe 人脸检测（FaceDetector）
+    implementation(libs.mediapipe.tasks.vision)
 
     testImplementation(libs.junit)
 }

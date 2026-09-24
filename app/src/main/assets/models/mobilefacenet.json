@@ -1,0 +1,17 @@
+{
+  "model": "mobilefacenet",
+  "image_size": 112,
+  "image_mean": [
+    127.5,
+    127.5,
+    127.5
+  ],
+  "image_std": [
+    128.0,
+    128.0,
+    128.0
+  ],
+  "embed_dim": 512,
+  "dtype": "fp32",
+  "batch": 1
+}

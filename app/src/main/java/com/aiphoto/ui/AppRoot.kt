@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.DateRange
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
@@ -33,6 +34,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import com.aiphoto.ui.album.SmartAlbumScreen
+import com.aiphoto.ui.people.PeopleScreen
 import com.aiphoto.ui.timeline.TimelineScreen
 
 @Composable
@@ -79,12 +81,19 @@ private fun MainScaffold() {
                     icon = { Icon(Icons.Filled.Star, contentDescription = null) },
                     label = { Text("智能相册") },
                 )
+                NavigationBarItem(
+                    selected = tab == 2,
+                    onClick = { tab = 2 },
+                    icon = { Icon(Icons.Filled.Person, contentDescription = null) },
+                    label = { Text("人物") },
+                )
             }
         },
     ) { innerPadding ->
         when (tab) {
             0 -> TimelineScreen(modifier = Modifier.padding(innerPadding))
-            else -> SmartAlbumScreen(modifier = Modifier.padding(innerPadding))
+            1 -> SmartAlbumScreen(modifier = Modifier.padding(innerPadding))
+            else -> PeopleScreen(modifier = Modifier.padding(innerPadding))
         }
     }
 }
