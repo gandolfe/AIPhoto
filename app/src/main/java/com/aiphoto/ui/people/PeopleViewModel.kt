@@ -91,6 +91,7 @@ class PeopleViewModel(application: Application) : AndroidViewModel(application) 
                 return@launch
             }
 
+            //加载已经识别的人物分类集合
             val clusterer = FaceClusterer()
             clusterer.load(faceDao.allPeople())
 

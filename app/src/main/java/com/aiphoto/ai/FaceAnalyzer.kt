@@ -28,7 +28,10 @@ class FaceAnalyzer(private val appContext: Context) : AutoCloseable {
         val embedding: FloatArray,
     )
 
+    // 创建一个单线程线程池，并且命名为"face-inference"
     private val executor = Executors.newSingleThreadExecutor { Thread(it, "face-inference") }
+
+    // 这一步是把线程池包装成协程调度器，支持供协程使用
     private val dispatcher = executor.asCoroutineDispatcher()
 
     private val loadMutex = Mutex()
@@ -55,10 +58,12 @@ class FaceAnalyzer(private val appContext: Context) : AutoCloseable {
             val d = ensureDetector() ?: return@runCatching emptyList<FaceFeature>()
             val e = ensureEmbedder() ?: return@runCatching emptyList<FaceFeature>()
 
+            // 这里会把人脸的检测结果返回，可能存在多个人脸
             val boxes = d.detect(bitmap)
             boxes.mapNotNull { box ->
                 val crop = FaceCropper.crop(bitmap, box) ?: return@mapNotNull null
                 try {
+                    // 做模型推理获取向量
                     FaceFeature(box, e.embed(crop))
                 } finally {
                     crop.recycle()

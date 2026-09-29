@@ -20,6 +20,11 @@ object ImageLoader {
 
     private const val TAG = "ImageLoader"
 
+
+    /**
+     * 加载图片，先加载缩略图，如果没有缩略图，或者缩略图尺寸达不到
+     * 则根据尺寸加载原图
+     */
     suspend fun loadForAnalysis(
         context: Context,
         uri: Uri,

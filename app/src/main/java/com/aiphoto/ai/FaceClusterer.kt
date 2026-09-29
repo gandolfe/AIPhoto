@@ -69,6 +69,7 @@ class FaceClusterer(private val threshold: Float = DEFAULT_THRESHOLD) {
         val hit = best
         if (hit != null && bestScore >= threshold) {
             val n = hit.count + 1
+            // 只要命中簇，就会用当前照片更新中心向量
             val updated = FloatArray(embedding.size) { i ->
                 (hit.centroid[i] * hit.count + embedding[i]) / n
             }
@@ -101,6 +102,10 @@ class FaceClusterer(private val threshold: Float = DEFAULT_THRESHOLD) {
 
         const val NEW_PERSON_ID = -1L
 
+        /**
+         * 这里是做点积运算
+         * 把两个向量做点积，返回的分数越接近1.0,就说明这两张图片越是一个人
+         */
         private fun dot(a: FloatArray, b: FloatArray): Float {
             var s = 0f
             val n = minOf(a.size, b.size)
@@ -108,6 +113,7 @@ class FaceClusterer(private val threshold: Float = DEFAULT_THRESHOLD) {
             return s
         }
 
+        // 向量做L2归一化
         private fun normalize(v: FloatArray) {
             var sum = 0f
             for (x in v) sum += x * x

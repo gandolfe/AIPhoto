@@ -131,13 +131,19 @@ class MobileFaceNet private constructor(
         if (outputs.isEmpty()) error("模型未返回任何输出")
 
         val embedding = outputs[0].toTensor().dataAsFloatArray
+        //做参数的校验，不符合要求会抛出IllegalArgumentException异常
         require(embedding.size == embedDim) {
             "embedding dim=${embedding.size} ≠ mobilefacenet.json 里的 $embedDim"
         }
+        //L2向量归一化
         normalize(embedding)
         return embedding
     }
 
+    /**
+     * 对向量做L2归一化，使得向量的模长刚好为1
+     * 这样比较两个向量的相似度，就只需要做点积运算，而不是复杂的余弦相似度计算
+     */
     private fun normalize(v: FloatArray) {
         var sum = 0f
         for (x in v) sum += x * x

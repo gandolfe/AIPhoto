@@ -8,7 +8,8 @@ import com.google.mediapipe.tasks.vision.core.RunningMode
 // MediaPipe 的 Options 是**嵌套类** FaceDetector.FaceDetectorOptions，不是同名的顶层类
 import com.google.mediapipe.tasks.vision.facedetector.FaceDetector as MpFaceDetector
 
-/** 检测到的一张人脸，坐标为相对原图的比例（0..1）。 */
+/** 检测到的一张人脸，坐标为相对原图的比例（0..1）。
+ * 这里使用比例，可以适配多种分辨率的情况；主要是后面封面的裁剪，读取的可能是原图 */
 data class DetectedFaceBox(
     val leftPct: Float,
     val topPct: Float,
@@ -54,6 +55,13 @@ class FaceDetector(context: Context) : AutoCloseable {
     /**
      * 检测一张图里的所有人脸。
      * 返回按置信度从高到低排序（MediaPipe 本身已排序，这里不再重排）。
+     *
+     *
+     * coerceIn 的作用是把一个数值限制（钳制）在指定的区间（最小值 ~ 最大值）之内。
+     * 1. 直观理解简单来说，它的效果等价于：
+     * 如果数值 小于最小值 ，则返回 最小值；
+     * 如果数值 大于最大值 则 返回 最大值；
+     * 如果数值 在区间范围内 则 保持原数值 不变。
      */
     fun detect(bitmap: Bitmap): List<DetectedFaceBox> {
         val mpImage = BitmapImageBuilder(bitmap).build()
