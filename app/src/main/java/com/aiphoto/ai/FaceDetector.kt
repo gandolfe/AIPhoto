@@ -35,7 +35,7 @@ class FaceDetector(context: Context) : AutoCloseable {
          * 短距离模型的召回率高但误检也多，0.5 是 MediaPipe 示例里的常用值。
          * 调低→更多框（含误检，会污染聚类）；调高→漏掉小脸/侧脸。
          */
-        private const val MIN_CONFIDENCE = 0.5f
+        private const val MIN_CONFIDENCE = 0.75f
     }
 
     private val detector: MpFaceDetector
