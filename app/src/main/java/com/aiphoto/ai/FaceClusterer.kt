@@ -98,7 +98,7 @@ class FaceClusterer(private val threshold: Float = DEFAULT_THRESHOLD) {
          *   - 调高 → 更容易拆分，风险是同一个人被拆成好几个「人物」
          * 经验范围 0.4 ~ 0.7。先用 0.5 跑一遍看结果，再按上面两条微调。
          */
-        const val DEFAULT_THRESHOLD = 0.4f
+        const val DEFAULT_THRESHOLD = 0.5f
 
         const val NEW_PERSON_ID = -1L
 

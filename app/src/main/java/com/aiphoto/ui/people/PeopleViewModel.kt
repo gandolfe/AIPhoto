@@ -114,43 +114,44 @@ class PeopleViewModel(application: Application) : AndroidViewModel(application) 
                 }
 
                 try {
-                    val features = faceAnalyzer.analyze(bitmap)
-                    if (features.isNotEmpty()) {
-                        val entities = ArrayList<FaceEntity>(features.size)
-                        for (f in features) {
-                            val assignment = clusterer.assign(f.embedding)
-                            val personId = if (assignment.isNew) {
-                                val id = faceDao.insertPerson(
-                                    PersonEntity(
-                                        centroid = assignment.centroid.toEmbeddingBytes(),
-                                        faceCount = 1,
-                                        coverPhotoId = photo.id,
-                                    )
-                                )
-                                clusterer.register(id, f.embedding)
-                                id
-                            } else {
-                                faceDao.updatePerson(
-                                    personId = assignment.personId,
+                    // 每张照片最多只出一张脸：清晰 + 正面 + 质量最好的那张
+                    val f = faceAnalyzer.analyze(bitmap)
+                    if (f != null) {
+                        val assignment = clusterer.assign(f.embedding)
+                        val personId = if (assignment.isNew) {
+                            val id = faceDao.insertPerson(
+                                PersonEntity(
                                     centroid = assignment.centroid.toEmbeddingBytes(),
-                                    faceCount = assignment.faceCount,
+                                    faceCount = 1,
                                     coverPhotoId = photo.id,
                                 )
-                                assignment.personId
-                            }
-                            entities += FaceEntity(
-                                photoId = photo.id,
-                                personId = personId,
-                                leftPct = f.box.leftPct,
-                                topPct = f.box.topPct,
-                                rightPct = f.box.rightPct,
-                                bottomPct = f.box.bottomPct,
-                                score = f.box.score,
-                                embedding = f.embedding.toEmbeddingBytes(),
                             )
+                            clusterer.register(id, f.embedding)
+                            id
+                        } else {
+                            faceDao.updatePerson(
+                                personId = assignment.personId,
+                                centroid = assignment.centroid.toEmbeddingBytes(),
+                                faceCount = assignment.faceCount,
+                                coverPhotoId = photo.id,
+                            )
+                            assignment.personId
                         }
-                        faceDao.insertFaces(entities)
-                        facesFound += features.size
+                        faceDao.insertFaces(
+                            listOf(
+                                FaceEntity(
+                                    photoId = photo.id,
+                                    personId = personId,
+                                    leftPct = f.box.leftPct,
+                                    topPct = f.box.topPct,
+                                    rightPct = f.box.rightPct,
+                                    bottomPct = f.box.bottomPct,
+                                    score = f.box.score,
+                                    embedding = f.embedding.toEmbeddingBytes(),
+                                )
+                            )
+                        )
+                        facesFound++
                     }
                 } finally {
                     bitmap.recycle()
@@ -162,7 +163,11 @@ class PeopleViewModel(application: Application) : AndroidViewModel(application) 
                     facesFound = facesFound,
                     peopleFound = clusterer.clusterCount(),
                 )
+                // 定期输出姿态/质量分布，用于校准「正面」判定阈值
+                if (done % 300 == 0) faceAnalyzer.dumpQualityStats()
             }
+
+            faceAnalyzer.dumpQualityStats()
 
             val seconds = (SystemClock.elapsedRealtime() - startedAt) / 1000
             _analysis.value = _analysis.value.copy(

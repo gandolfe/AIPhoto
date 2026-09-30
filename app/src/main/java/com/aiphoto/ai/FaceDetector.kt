@@ -17,6 +17,12 @@ data class DetectedFaceBox(
     val bottomPct: Float,
     /** 检测置信度。 */
     val score: Float,
+    /**
+     * MediaPipe 人脸关键点（**相对整张图**归一化，不是相对人脸框），顺序固定为
+     * 右眼 / 左眼 / 鼻尖 / 嘴中心 / 右耳屏 / 左耳屏。
+     * 模型不输出关键点时为 null —— 此时无法判断正/侧脸，调用方应放行而不是拒绝。
+     */
+    val keypoints: List<Pair<Float, Float>>? = null,
 )
 
 /**
@@ -80,6 +86,9 @@ class FaceDetector(context: Context) : AutoCloseable {
                 rightPct = (box.right / w).coerceIn(0f, 1f),
                 bottomPct = (box.bottom / h).coerceIn(0f, 1f),
                 score = score,
+                keypoints = detection.keypoints()
+                    .map { pts -> pts.map { p -> p.x() to p.y() } }
+                    .orElse(null),
             )
         }
     }
