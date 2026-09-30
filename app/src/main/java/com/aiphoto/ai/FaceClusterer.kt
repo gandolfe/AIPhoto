@@ -97,6 +97,7 @@ class FaceClusterer(private val threshold: Float = DEFAULT_THRESHOLD) {
          *   - 调低 → 更容易合并，风险是不同人被并成一个人
          *   - 调高 → 更容易拆分，风险是同一个人被拆成好几个「人物」
          * 经验范围 0.4 ~ 0.7。先用 0.5 跑一遍看结果，再按上面两条微调。
+         * 余弦相似度0.5f的阈值不能动，低于0.5就会出现同一个人物相册混了多个人
          */
         const val DEFAULT_THRESHOLD = 0.5f
 
