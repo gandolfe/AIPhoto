@@ -46,8 +46,9 @@ class PeopleViewModel(application: Application) : AndroidViewModel(application) 
     private val appContext = application
 
     /** 人物列表（含每人照片数），由数据库 Flow 驱动 —— 簇是聚类出来的，不能写死。 */
-    val people: StateFlow<List<PersonSummary>> = faceDao.observePersonSummaries()
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+    val people: StateFlow<List<PersonSummary>> =
+        faceDao.observePersonSummaries(FaceClusterer.MIN_PHOTOS_PER_PERSON)
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     private val _analysis = MutableStateFlow(FaceAnalysisState())
     val analysis: StateFlow<FaceAnalysisState> = _analysis.asStateFlow()
@@ -64,6 +65,9 @@ class PeopleViewModel(application: Application) : AndroidViewModel(application) 
 
     private val _loading = MutableStateFlow(false)
     val loading: StateFlow<Boolean> = _loading.asStateFlow()
+
+    /** 增量聚类的内存态，跨「分析 → 收尾剪枝」两步共用。 */
+    private val clusterer = FaceClusterer()
 
     /**
      * 人脸检测 + 特征提取 + 聚类。
@@ -92,7 +96,6 @@ class PeopleViewModel(application: Application) : AndroidViewModel(application) 
             }
 
             //加载已经识别的人物分类集合
-            val clusterer = FaceClusterer()
             clusterer.load(faceDao.allPeople())
 
             _analysis.value = FaceAnalysisState(running = true, total = pending.size)
@@ -161,7 +164,8 @@ class PeopleViewModel(application: Application) : AndroidViewModel(application) 
                 _analysis.value = _analysis.value.copy(
                     done = done,
                     facesFound = facesFound,
-                    peopleFound = clusterer.clusterCount(),
+                    // 只报「够格」的人数，碎片簇反正最后会被丢弃
+                    peopleFound = clusterer.clusterCountAtLeast(FaceClusterer.MIN_PHOTOS_PER_PERSON),
                 )
                 // 定期输出姿态/质量分布，用于校准「正面」判定阈值
                 if (done % 300 == 0) faceAnalyzer.dumpQualityStats()
@@ -169,15 +173,50 @@ class PeopleViewModel(application: Application) : AndroidViewModel(application) 
 
             faceAnalyzer.dumpQualityStats()
 
+            // 收尾：丢掉照片数不够的碎片簇，只留够份的人物
+            val minPhotos = FaceClusterer.MIN_PHOTOS_PER_PERSON
+            val dropped = pruneSmallClusters()
+            val keptPeople = clusterer.clusterCount()
+
             val seconds = (SystemClock.elapsedRealtime() - startedAt) / 1000
             _analysis.value = _analysis.value.copy(
                 running = false,
                 phase = "",
-                message = "完成：检出 $facesFound 张人脸，归为 ${clusterer.clusterCount()} 个人物，用时 ${seconds}s",
+                peopleFound = keptPeople,
+                message = "完成：检出 $facesFound 张人脸，归为 $keptPeople 个人物" +
+                    "（丢弃 $dropped 个不足 ${minPhotos} 张照片的碎片簇），用时 ${seconds}s",
             )
-            Log.i(TAG, "人脸分析完成: 图=${pending.size} 脸=$facesFound 人=${clusterer.clusterCount()}")
+            Log.i(
+                TAG,
+                "人脸分析完成: 图=${pending.size} 脸=$facesFound 人=$keptPeople 丢弃小簇=$dropped",
+            )
             loadCovers()
         }
+    }
+
+    /**
+     * 丢弃照片数不足 [FaceClusterer.MIN_PHOTOS_PER_PERSON] 的簇。
+     *
+     * 人脸行不删，只把 personId 置 0（未归属）：这样这些照片仍算「已分析」不会被重复检测，
+     * embedding 也留着，以后想放宽门槛可以基于现有数据重聚类。
+     *
+     * @return 被丢弃的人物数。
+     */
+    private suspend fun pruneSmallClusters(): Int {
+        val minPhotos = FaceClusterer.MIN_PHOTOS_PER_PERSON
+        val ids = faceDao.personIdsWithFewerPhotosThan(minPhotos)
+        if (ids.isEmpty()) return 0
+
+        // SQLite 单条语句的变量数有上限，大库分批删
+        ids.chunked(400).forEach { chunk ->
+            faceDao.detachFaces(chunk)
+            faceDao.deletePeople(chunk)
+        }
+        clusterer.remove(ids)
+        val dropped = ids.toHashSet()
+        _covers.value = _covers.value.filterKeys { it !in dropped }
+        Log.i(TAG, "丢弃碎片簇: ${ids.size} 个（<$minPhotos 张照片）")
+        return ids.size
     }
 
     /** 打开某个人物的相册。 */

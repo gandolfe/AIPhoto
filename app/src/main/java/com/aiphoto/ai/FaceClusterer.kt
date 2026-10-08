@@ -87,7 +87,17 @@ class FaceClusterer(private val threshold: Float = DEFAULT_THRESHOLD) {
         clusters += Cluster(personId, embedding.copyOf(), 1)
     }
 
+    /** 数据库里删掉某些人物后同步内存（否则计数和后续分配会用上已删除的簇）。 */
+    fun remove(personIds: Collection<Long>) {
+        if (personIds.isEmpty()) return
+        val drop = personIds.toHashSet()
+        clusters.removeAll { it.personId in drop }
+    }
+
     fun clusterCount(): Int = clusters.size
+
+    /** 人脸数达到 [minCount] 的簇数量：进度里展示这个，免得把待丢弃的碎片也算进「人物数」。 */
+    fun clusterCountAtLeast(minCount: Int): Int = clusters.count { it.count >= minCount }
 
     companion object {
         /**
@@ -102,6 +112,14 @@ class FaceClusterer(private val threshold: Float = DEFAULT_THRESHOLD) {
         const val DEFAULT_THRESHOLD = 0.5f
 
         const val NEW_PERSON_ID = -1L
+
+        /**
+         * 一个「人物」至少要出现在这几张**照片**里才会被保留。
+         *
+         * 聚类总会掉出一堆只有 1~2 张的碎片簇（侧脸、糊图、路人），没有做成相册的价值，
+         * 数量还特别多，所以收尾统一丢弃，只留够份的。想更严格就调大。
+         */
+        const val MIN_PHOTOS_PER_PERSON = 8
 
         /**
          * 这里是做点积运算
