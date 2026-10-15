@@ -1,101 +1,66 @@
-# AIPhoto
+一、功能介绍：
+此相册核心的特点是，可以本地调用图像分类模型，把手机里的照片自动分类。有两种分类逻辑：
+1.把照片按场景做分类。比如自然风景、城市建筑、人物、动物、食物、物品、事件等大的分类。
+这些大类下面，还可以划分一些更细的分类，比如自然风景可以划分成海边、大山、日出日落、花卉、湖景、雪景、天空等。
 
-Android 端侧 AI 相册：按**场景**分类照片、按**人物**聚合人脸。
-所有推理都在手机本地完成，不联网、不上传。
+2.把照片按照人物做聚类。这里会把同一个人的照片划分到一个相册里做聚合。但是同一个人由于年龄增长、发型、表情等因素，会导致同一个人会有多个聚类。
 
-## 技术栈
 
-| 领域    | 选型 |
-|-------|---|
-| UI    | Jetpack Compose + Material3，单 Activity + 底部导航 |
-| 异步    | Kotlin Coroutines / Flow |
-| 数据    | Room（SQLite）+ MediaStore |
-| 依赖注入  | 手写 `AppContainer`（项目规模下不引入 Hilt） |
-| 图片加载  | Coil |
-| 端侧推理  | **ExecuTorch**（`executorch-android`，XNNPACK 后端，加载 `.pte`） |
-| 人脸框检测 | **MediaPipe Tasks Vision**（`tasks-vision`，加载 `.tflite`） |
-| 模型导出  | PyTorch `torch.export` → ExecuTorch（脚本在 `tools/`，Colab 跑） |
+二、技术路线：
+1.场景分类的技术路线：
+使用苹果公司训练的分类模型MobileCLIP-S1，在python环境使用ExecuTorch导出工具导出.pte模型文件，在手机端侧使用Executorch推理引擎加载.pte模型文件，执行推理。
+在导出.pte文件啥时候，需要提供一个用文本定义好分类的json文件，MobileCLIP会使用自身的Text Encoder(文本编码器)去对这些本文做运算，每个分类会得到一个512维度的浮点数向量。
+在端侧对图片执行完推理之后，也会得到一个512维的浮点数向量，图片向量和文本向量被拉到了同一个维度，这时候直接对两个向量计算相似度（点积/余弦相似度）。
+（两个向量点积的运算方式，就是把同一维度相乘，然后累加）
+最后把这张照片归入到相似度得分最高的分类标签里。
 
-## 整体架构
+模型特点：
+专门为边缘设备优化的轻量级(视觉-文本)模型。
+增加图片分类时不需要收集数据集并重新训练模型，而只需要增加文本描述	，生成新的向量即可。对比MobileNet的固定映射，MobileCLIP更适合开放式场景。
 
-```
-ui/         界面层：Compose 画面 + ViewModel（持有进度/结果状态）
-   ↓
-ai/         推理层：模型加载、预处理、forward、聚类
-   ↓
-data/       数据层：MediaStore 读图、Room 落库、内存图片索引
-```
+推理路线：
+加载图片 -> 图片缩放到256*256 -> 转换NCHW（把像素点RGB提取出来）做归一化 -> fp32转fp16(导出模型时定义的fp16)
+-> Executorch引擎张量输入 ->MobileCLIP.pte模型推理 -> 512维embedding -> 与文本向量做点积/余弦相似 ->获取得分最高的分类 ->通过room写入数据库
 
-三个 tab 对应三块功能：**时间线**（照片流 + 场景分析入口）、**智能相册**（分类浏览）、**人物**（人脸聚合）。
 
-### 分层职责
+2.人物聚类的技术路线：
+采用2级推理方案，先用一个模型快速检测出图片的人脸，再用另一个模型对脸部区域做推理，并根据向量值做聚类。
 
-| 包 | 职责 |
-|---|---|
-| `ui/` | 页面与 ViewModel；批量分析的进度推进、已分析去重 |
-| `ai/` | 模型封装与推理编排；**不含 UI、不直接写库** |
-| `data/` | `MediaImage` / `PhotoStore`（内存索引、分页）/ Room 实体与 DAO |
-| `AppContainer` | 全局单例，持有 Store、DAO、Analyzer |
+具体的方案：
+	使用Google的MediaPipe端侧引擎架构，加载MediaPipe平台已经导好的face_short_range.tflite模型文件，不需要张量的预处理，MediaPipe引擎内部会做处理。
+	MediaPipe推理完成之后，会返回一个检测结果，包含人脸的矩形框坐标、五官的外置信息。
+	去除掉太小的脸、侧脸等不符合要求的脸框后，把符合要求的脸框裁剪，送入到另外一个模型MobileFaceNet，做推理获取特征向量。
+	把本此获取的特征向量跟已经存在的人物聚类的特征向量做点击/余弦相似计算，最高得分数大于一个常量阈值（0.5），则归类，同时更新聚类中心向量；
+	如果小于常量阈值(0.5)，那么说明是一个新人物，需新增一个人物聚类。
 
-### 两个贯穿全局的设计
 
-1. **推理不并发**：`ExecuTorch Module` 非线程安全，每个链路各用一个**单线程 dispatcher** 串行执行（场景用 `clip-inference`，人脸用 `face-inference`，互不抢资源）。
-2. **`.pte` 只出 embedding，决策在 Kotlin 侧**：模型负责把图编成向量，分类/聚类/排序都在 App 里算。所以**换标签或调聚类阈值不用重新导出模型**。
+推理路线：
+加载图片 -> MeidaPipe框架自动处理图片 -> face_short_range.tflite模型推理 -> 检测出人脸矩形框
+-> 人脸合规检测 ->裁剪人脸框 -> 图片缩放到112*112 ->提取像素RGB，转换NCHW做归一化处理
+->Excutorch引擎输入张量 ->MobileFaceNet模型推理 ->512维特征向量 -> L2向量归一化
+->点积/余弦相似度运算 ->归入人物分类 -> 更新中心向量
 
-## 两条推理链路
 
-### 1. 场景分类
+三、整体架构：
+单Activity + scaffold + ScNavigationBar，组成组件显示框架。
+ViewModel + StateFlow + Room，构建响应式编程，用数据驱动界面的显示。
+使用MediaStore获取图片，并作分页加载。
+使用协程做线程的转换，以及模型推理的异步实现。
+使用MediaPipe框架加载LiteRT引擎，使用.ftlite模型推理；
+使用Executorch引擎加载.pte模型文件做推理。
 
-```
-图片 → 缩放 256×256 → fp16 张量 → MobileCLIP 视觉塔(.pte)
-     → 512 维 embedding → 与 label_bank 点积(即余弦) → softmax → 34 类
-     → 写入 Room (photo_tags)
-```
 
-### 2. 人物聚合
 
-```
-图片 → MediaPipe 检出人脸框 → 按框裁出人脸(扩边 25%)
-     → MobileFaceNet(.pte) → 512 维 embedding
-     → 与已有簇质心比余弦，超阈值归簇、否则新建簇（增量聚类 O(n·k)）
-     → 写入 Room (face_tags / people)
-```
+四、问题和挑战
+1.模型选型和导出问题
+图像处理的模型很多，推理的引擎也是很多，要选用适合项目的。
+我选用的MediaPipe（LiteRT）引擎和Executorch引擎，是TensorFlow和Pytorch这两个主流的模型训练平台，在端侧边缘设备部署的最新的解决方案。
+导出的时候，使用XNNP神经算子库加速模型在端侧CPU上的速度。
+模型导出到端侧做量化的程度，fp32是保持原有模型的精度；fp16是精度减半；Int8则是做了整形的量化，这时候需要对模型做预训练才行。
 
-聚类用增量方式而非「最后两两比较」——几千张脸两两比是 O(n²)，端侧不可接受。
+	2.要兼顾速度和准确性
+	使用2级模型推理：第一级采用快速人脸检测模型，框出人脸区域；第二级再做特征向量提取
 
-## 模型文件
-
-放 `app/src/main/assets/models/`（缺文件时对应功能会提示「未找到模型」而非崩溃）：
-
-| 文件 | 用途 | 来源 |
-|---|---|---|
-| `clip_scene.pte` | 场景编码 | `tools/colab_export_clip.py` |
-| `labels.json` / `label_bank.json` / `label_bank.bin` | 类别元数据与标签向量 | 同上 |
-| `face_detector.tflite` | MediaPipe 人脸检测 | BlazeFace short range |
-| `mobilefacenet.pte` + `mobilefacenet.json` | 人脸特征提取与元数据 | `tools/colab_export_mobilefacenet.py` |
-
-`build.gradle.kts` 里对 `pte` / `tflite` / `task` 配了 `noCompress`，保证模型未被压缩（MediaPipe 要求；`.pte` 也依赖它才能 `openFd` + mmap）。
-
-## 构建运行
-
-AGP 8.7.3 需 JDK ≥ 11：
-
-```cmd
-set JAVA_HOME=C:\Program Files\Android\Android Studio1\jbr
-gradlew.bat assembleDebug
-adb install -r -g app\build\outputs\apk\debug\app-debug.apk
-```
-
-## 几个要点
-
-- **归一化参数不硬编码**：`image_size` / `mean` / `std` / `embed_dim` 都从模型的 `.json` 元数据读（`labels.json`、`mobilefacenet.json`）。换模型只换文件即可。
-- **数据库有 Migration**：`AppDatabase` 是 v2 且提供了 `Migration(1,2)`。升级版本时必须补迁移，否则 Room 的 `fallbackToDestructiveMigration()` 会**删库重建**、已分析结果全丢。
-- **已分析过的照片会跳过**：换模型后旧结果不兼容，需先用界面上的「清空」清掉再跑。
-- **息屏会被冻结**：vivo 等机型息屏后批量分析会中断，长时间跑批先 `adb shell svc power stayon usb`。
-- **人物聚类阈值**：`FaceClusterer.DEFAULT_THRESHOLD`（默认 0.5，范围 0.4~0.7）。同人被拆成多个就调低，不同人被并成一个就调高。
-
-## 排查手段
-
-- 计时日志：`ClipSceneClassifier` / `SceneAnalyzer` / `TimelineVM` / `FaceAnalyzer` / `MobileFaceNet` 各 tag 分段打印耗时
-- 直接查库：`adb shell run-as com.aiphoto sqlite3 databases/aiphoto.db "select count(*) from face_tags;"`
-- 已落盘模型：`adb shell run-as com.aiphoto ls -l files/models/`
+	3.人物分类太分散问题
+	设置合理阈值(0.5)，过高会导致同一个人分成多个聚类；过低，会导致同一个聚类里面混有不同的人
+	推理前对人脸质量做过滤，小头像、侧脸直接丢弃。
